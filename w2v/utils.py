@@ -27,5 +27,5 @@ def find_and_load_token_files():
             lines = byte_list.decode('utf-8').split('\n')
             for line in csv.reader(lines):
                 if len(line) == 1:
-                    yield line[0]
+                    yield (cat, line[0].split(' '))
     ftp.quit()
