@@ -2,14 +2,14 @@ import random
 
 import numpy as np
 
-from w2v import utils, word2vec
+from w2v import settings, utils, word2vec
 
 
 def main():
     token_gen = utils.find_and_load_token_files()
     token_gen = [line for _, line in token_gen]
     # print(sorted(token_gen)[0])
-    token_gen = sorted(token_gen)[:500]
+    token_gen = sorted(token_gen)[:settings.NUM_DOCUMENTS]
     # token_gen= [('aa','I want to eat an apple everyday'.split(' '))]
 
     w2v = word2vec.Word2Vec(window=15,  alpha=0.0005, size=200)
