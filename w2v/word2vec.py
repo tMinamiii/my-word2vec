@@ -15,6 +15,7 @@ class Vocabulary():
         self.counter = collections.Counter()
 
     def has(self, data):
+        # 単語 or 単語リストが辞書にあるか無いかを判定する
         if type(data) == str:
             return data in self.token_to_id
         if type(data) == list:
@@ -35,6 +36,23 @@ class Vocabulary():
                 self.id_to_token[self.seq_no_id] = tok
                 self.seq_no_id += 1
 
+    def one_hot(self, data):
+        dim = self.seq_no_id
+        if type(data) == str:
+            # 入力層用
+            one_hot = zeros(dim)
+            one_hot[self.token_to_id[data]] = 1.0
+            # print('input  {}'.format(one_hot))
+            return [one_hot]
+        if type(data) == list:
+            # 出力層用
+            one_hot = zeros(dim)
+            for t in data:
+                if self.has(t):
+                    one_hot[self.token_to_id[t]] += 1.0
+            # print('output {}'.format(one_hot))
+            return [one_hot]
+
 
 class Word2Vec():
     # Skip Gram Model
@@ -46,21 +64,6 @@ class Word2Vec():
         self.w = None
         self.w_ = None
         self.vocab = None
-
-    def one_hot(self, data):
-        dim = self.vocab.seq_no_id
-        if type(data) == str:
-            one_hot = zeros(dim)
-            one_hot[self.vocab.token_to_id[data]] = 1.0
-            # print('input  {}'.format(one_hot))
-            return [one_hot]
-        if type(data) == list:
-            one_hot = zeros(dim)
-            for t in data:
-                if self.vocab.has(t):
-                    one_hot[self.vocab.token_to_id[t]] += 1.0
-            # print('output {}'.format(one_hot))
-            return [one_hot]
 
     def make_model(self, data):
         self.vocab = Vocabulary()
@@ -95,8 +98,8 @@ class Word2Vec():
         for tokens in data:
             for in_token, out_tokens in self.slice_window(tokens):
                 if self.vocab.has(in_token) and self.vocab.has(out_tokens):
-                    in_vecs.extend(self.one_hot(in_token))
-                    out_vecs.extend(self.one_hot(out_tokens))
+                    in_vecs.extend(self.vocab.one_hot(in_token))
+                    out_vecs.extend(self.vocab.one_hot(out_tokens))
             # w, w_ = self.run_session(input_vecs, output_vecs)
             q.put((in_vecs, out_vecs))
             in_vecs = []

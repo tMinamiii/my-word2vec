@@ -24,7 +24,7 @@ class NeuralNetwork():
                 learning_rate=learning_rate).minimize(loss)
 
         self.w1 = w1
-        self.w0 = w1
+        self.w0 = w0
         self.b1 = b1
         self.x = x
         self.t = t
