@@ -2,8 +2,8 @@ import collections
 import queue
 import threading
 
-from numpy import zeros
-
+import time
+import numpy as np
 from w2v import neuralnet, settings
 
 
@@ -28,42 +28,77 @@ class Vocabulary():
         self.counter.update(tokens)
 
     def build(self):
+        # Counterを使って単語を出現頻度順に並べてある
         for tok, count in self.counter.most_common():
+            if count >= settings.VOCABULARY_MAX_COUNT:
+                print(tok)
+                continue
             if count <= settings.VOCABULARY_MIN_COUNT:
                 break
-            if tok not in self.token_to_id:
-                self.token_to_id[tok] = self.seq_no_id
-                self.id_to_token[self.seq_no_id] = tok
-                self.seq_no_id += 1
+            self.token_to_id[tok] = self.seq_no_id
+            self.id_to_token[self.seq_no_id] = tok
+            self.seq_no_id += 1
+
+    def huffman(self, data):
+        if type(data) == str:
+            dim = self.seq_no_id
+            huffman = np.zeros(dim)
+            # 入力層用
+            if not self.has(data):
+                return [huffman]
+            seq_no = self.token_to_id[data]
+            for i in range(seq_no + 1):
+                huffman[i] = 1.0
+            return [huffman]
+        elif type(data) == list:
+            # 出力層用
+            dim = self.seq_no_id
+            huffman = [0.0] * dim
+            for t in data:
+                if not self.has(t):
+                    continue
+                seq_no = self.token_to_id[t]
+                for i in range(seq_no + 1):
+                    huffman[i] += 1.0
+            return [np.array(huffman)]
 
     def one_hot(self, data):
-        dim = self.seq_no_id
         if type(data) == str:
             # 入力層用
-            one_hot = zeros(dim)
+            dim = self.seq_no_id
+            one_hot = np.zeros(dim)
+            if not self.has(data):
+                return [one_hot]
             one_hot[self.token_to_id[data]] = 1.0
-            # print('input  {}'.format(one_hot))
             return [one_hot]
-        if type(data) == list:
+        elif type(data) == list:
             # 出力層用
-            one_hot = zeros(dim)
+            dim = self.seq_no_id
+            one_hot = np.zeros(dim)
             for t in data:
                 if self.has(t):
                     one_hot[self.token_to_id[t]] += 1.0
-            # print('output {}'.format(one_hot))
+            # return [one_hot / np.linalg.norm(one_hot)]
             return [one_hot]
 
 
 class Word2Vec():
     # Skip Gram Model
-    def __init__(self, window, alpha, size):
+    def __init__(self, window, alpha, size, codec='one_hot'):
         self.window_size = window
         self.nn = neuralnet.NeuralNetwork()
         self.alpha = alpha
         self.size = size
+        self.codec = codec
         self.w = None
         self.w_ = None
         self.vocab = None
+
+    def vectorize(self, data):
+        if self.codec == 'one_hot':
+            return self.vocab.one_hot(data)
+        elif self.codec == 'huffman':
+            return self.vocab.huffman(data)
 
     def make_model(self, data):
         self.vocab = Vocabulary()
@@ -90,25 +125,46 @@ class Word2Vec():
 
     def train(self, data):
         nn = self.nn
-        q = queue.Queue(2)
+        q = queue.Queue(50)
         th = SessionRunner(nn, q)
         th.start()
-        in_vecs = []
-        out_vecs = []
+        starttime = time.time()
         for tokens in data:
-            for in_token, out_tokens in self.slice_window(tokens):
-                if self.vocab.has(in_token) and self.vocab.has(out_tokens):
-                    in_vecs.extend(self.vocab.one_hot(in_token))
-                    out_vecs.extend(self.vocab.one_hot(out_tokens))
-            # w, w_ = self.run_session(input_vecs, output_vecs)
-            q.put((in_vecs, out_vecs))
             in_vecs = []
             out_vecs = []
+            for in_token, out_tokens in self.slice_window(tokens):
+                if self.vocab.has(in_token) and self.vocab.has(out_tokens):
+                    in_vecs.extend(self.vectorize(in_token))
+                    out_vecs.extend(self.vectorize(out_tokens))
+            q.put((np.array(in_vecs), np.array(out_vecs)))
         q.put((None, None))
         th.join()
 
-        # return w, w_
+        endtime = time.time()
+        print(endtime - starttime)
+        self.w = th.w
+        self.w_ = th.w_
         return th.w, th.w_
+
+    def most_similar(self, token, rank):
+        code = self.vectorize(token)[0]
+        wx = np.dot(code, self.w)
+        predict = np.dot(wx, self.w_)
+        if False:
+            sort = predict.argsort()[::-1]
+            most_similar = [self.vocab.id_to_token[i] for i in sort[:rank]]
+            return most_similar
+        else:
+            most_similar = []
+            for tok, seq_no in self.vocab.token_to_id.items():
+                predict = predict / np.linalg.norm(predict)
+                vec = self.vectorize(tok)[0]
+                vec = vec / np.linalg.norm(vec)
+                cos_sim = np.dot(vec, predict)
+                most_similar.append((cos_sim, tok))
+                most_similar = sorted(most_similar, reverse=True)
+                most_similar = most_similar[:10]
+            return np.array(most_similar)[:, :]
 
 
 class SessionRunner(threading.Thread):

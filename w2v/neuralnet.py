@@ -30,7 +30,6 @@ class NeuralNetwork():
         self.t = t
         self.p = p
         self.train_step = train_step
-        self.loss = loss
 
     def prepare_session(self):
         sess = tf.Session()
