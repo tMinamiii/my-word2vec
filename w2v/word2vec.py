@@ -172,7 +172,6 @@ class Word2Vec():
         predict = np.dot(wx, self.w_)
         predict /= np.linalg.norm(predict)
         pred_softmax = self._softmax(predict)
-        print(np.sum(pred_softmax), np.max(pred_softmax))
         # softmax関数に通して0-1の値にした後ソートして上位を類似ワードとする
         sort = pred_softmax.argsort()[::-1]
         most_similar = []
