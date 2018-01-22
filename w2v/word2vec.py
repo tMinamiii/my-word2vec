@@ -1,9 +1,10 @@
 import collections
 import queue
 import threading
-
 import time
+
 import numpy as np
+
 from w2v import neuralnet, settings
 
 
@@ -146,25 +147,52 @@ class Word2Vec():
         self.w_ = th.w_
         return th.w, th.w_
 
+    def softmax(self, vec):
+        vec_exp = np.exp(vec)
+        vec_sum = sum(vec_exp)
+        return vec_exp / vec_sum
+
     def most_similar(self, token, rank):
         code = self.vectorize(token)[0]
         wx = np.dot(code, self.w)
-        predict = np.dot(wx, self.w_)
+        predict = np.dot(wx.T, self.w_)
         if False:
             sort = predict.argsort()[::-1]
             most_similar = [self.vocab.id_to_token[i] for i in sort[:rank]]
             return most_similar
-        else:
+        elif False:
             most_similar = []
+            print(wx.T.shape)
+            softmax_wx = self.softmax(wx.T)
+            for i, vec in enumerate(self.w):
+                vec = self.softmax(vec)
+                cos_sim = np.dot(softmax_wx, vec.T)
+                most_similar.append((cos_sim, self.vocab.id_to_token[i]))
+                most_similar = sorted(most_similar, reverse=True)
+                most_similar = most_similar[:10]
+            return np.array(most_similar)[:, :]
+        elif False:
+            most_similar = []
+            predict_exp = np.exp(predict)
+            predict_sum = sum(predict_exp)
+            softmax = predict_exp / predict_sum
+            print(softmax.shape)
             for tok, seq_no in self.vocab.token_to_id.items():
-                predict = predict / np.linalg.norm(predict)
                 vec = self.vectorize(tok)[0]
                 vec = vec / np.linalg.norm(vec)
-                cos_sim = np.dot(vec, predict)
+                cos_sim = np.dot(softmax, vec.T)
                 most_similar.append((cos_sim, tok))
                 most_similar = sorted(most_similar, reverse=True)
                 most_similar = most_similar[:10]
             return np.array(most_similar)[:, :]
+        elif True:
+            predict_exp = np.exp(predict)
+            predict_sum = sum(predict_exp)
+            softmax = predict_exp / predict_sum
+            sort = softmax.argsort()[::-1]
+            most_similar = [(softmax[i],
+                             self.vocab.id_to_token[i]) for i in sort[:rank]]
+            return most_similar
 
 
 class SessionRunner(threading.Thread):

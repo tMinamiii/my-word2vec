@@ -10,7 +10,10 @@ def main():
     token_gen = sorted(token_gen)[:settings.NUM_DOCUMENTS]
     # token_gen= [('aa','I want to eat an apple everyday'.split(' '))]
 
-    w2v = word2vec.Word2Vec(window=15, alpha=0.005, size=100, codec='one_hot')
+    w2v = word2vec.Word2Vec(window=settings.WINDOW,
+                            alpha=settings.ALPHA,
+                            size=settings.SIZE,
+                            codec='one_hot')
     w2v.make_model(token_gen)
     word = 'iphone'
     rank = 10
